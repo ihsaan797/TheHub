@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { DailyOccupancy } from '../types';
-import { Calendar, Save, TrendingUp, ChevronLeft, ChevronRight, AlertCircle, Info } from 'lucide-react';
+import { Calendar, Save, TrendingUp, ChevronLeft, ChevronRight, Info, FileUp, Download } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface OccupancyManagementProps {
@@ -11,6 +11,7 @@ interface OccupancyManagementProps {
 export const OccupancyManagement: React.FC<OccupancyManagementProps> = ({ occupancyData, onUpdateOccupancy }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Create a local editable copy of the data for the current view to handle inputs before saving
   const [localData, setLocalData] = useState<DailyOccupancy[]>(occupancyData);
@@ -75,6 +76,95 @@ export const OccupancyManagement: React.FC<OccupancyManagementProps> = ({ occupa
       setHasUnsavedChanges(false);
   };
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+          const text = event.target?.result as string;
+          if (!text) return;
+
+          try {
+              const lines = text.split(/\r?\n/);
+              const newDataMap = new Map<string, DailyOccupancy>();
+              let processedCount = 0;
+
+              lines.forEach((line, index) => {
+                  const trimmedLine = line.trim();
+                  if (!trimmedLine) return;
+                  
+                  // Expect CSV: YYYY-MM-DD,Percentage,Notes
+                  const parts = trimmedLine.split(',');
+                  
+                  // Check date format YYYY-MM-DD
+                  const dateStr = parts[0].trim();
+                  // Skip header or invalid lines
+                  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
+
+                  const percentage = parseInt(parts[1]?.trim() || '0');
+                  // Handle notes that might contain commas by re-joining
+                  const notes = parts.slice(2).join(',').trim().replace(/^"|"$/g, '');
+
+                  if (!isNaN(percentage)) {
+                      newDataMap.set(dateStr, {
+                          date: dateStr,
+                          percentage: Math.min(100, Math.max(0, percentage)),
+                          notes: notes
+                      });
+                      processedCount++;
+                  }
+              });
+
+              if (newDataMap.size > 0) {
+                  setLocalData(prev => {
+                      const updated = [...prev];
+                      newDataMap.forEach((val) => {
+                          const idx = updated.findIndex(u => u.date === val.date);
+                          if (idx >= 0) {
+                              updated[idx] = { ...updated[idx], percentage: val.percentage, notes: val.notes || updated[idx].notes };
+                          } else {
+                              updated.push(val);
+                          }
+                      });
+                      return updated;
+                  });
+                  setHasUnsavedChanges(true);
+                  
+                  // If uploaded data contains current view range, stay there, otherwise jump to first uploaded date
+                  const firstDate = newDataMap.keys().next().value;
+                  if (firstDate) {
+                      setCurrentDate(new Date(firstDate));
+                  }
+                  
+                  alert(`Successfully processed ${processedCount} records from file.`);
+              } else {
+                  alert("No valid data found. Please ensure CSV format: YYYY-MM-DD, Percentage, Notes");
+              }
+          } catch (err) {
+              console.error("Error parsing CSV:", err);
+              alert("Error parsing file. Please check the format.");
+          }
+          
+          // Reset input
+          if (fileInputRef.current) fileInputRef.current.value = '';
+      };
+      reader.readAsText(file);
+  };
+
+  const handleDownloadTemplate = () => {
+      const template = "Date,Percentage,Notes\n2024-01-01,85,New Year Arrivals\n2024-01-02,90,High Occupancy";
+      const blob = new Blob([template], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'occupancy_template.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+  };
+
   // Prepare chart data for the selected week
   const chartData = weekDays.map(day => {
       const dateStr = day.toISOString().split('T')[0];
@@ -89,7 +179,8 @@ export const OccupancyManagement: React.FC<OccupancyManagementProps> = ({ occupa
   const averageOccupancy = Math.round(chartData.reduce((acc, curr) => acc + curr.value, 0) / 7);
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-6xl mx-auto h-[calc(100vh-140px)] flex flex-col">
+    <div className="space-y-6 animate-fade-in max-w-6xl mx-auto h-[calc(100vh-140px)] flex flex-col relative">
+       
        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
@@ -98,7 +189,7 @@ export const OccupancyManagement: React.FC<OccupancyManagementProps> = ({ occupa
           <p className="text-gray-500">Manage daily occupancy forecasts and operational notes.</p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
              <div className="flex items-center bg-white border border-gray-200 rounded-lg p-1 shadow-sm">
                  <button onClick={handlePrevWeek} className="p-1 hover:bg-gray-100 rounded text-gray-600"><ChevronLeft size={20} /></button>
                  <div className="px-4 py-1 text-sm font-bold text-gray-800 flex items-center gap-2">
@@ -108,6 +199,31 @@ export const OccupancyManagement: React.FC<OccupancyManagementProps> = ({ occupa
                  <button onClick={handleNextWeek} className="p-1 hover:bg-gray-100 rounded text-gray-600"><ChevronRight size={20} /></button>
              </div>
              
+             {/* Hidden File Input */}
+             <input 
+                 type="file" 
+                 ref={fileInputRef} 
+                 className="hidden" 
+                 accept=".csv,.txt"
+                 onChange={handleFileUpload}
+             />
+
+             <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+                <button 
+                    onClick={handleDownloadTemplate}
+                    className="px-3 py-1.5 text-gray-600 hover:text-nova-teal text-xs font-medium flex items-center gap-1 border-r border-gray-300 pr-2 mr-1"
+                    title="Download CSV Template"
+                >
+                    <Download size={14} /> Template
+                </button>
+                <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-3 py-1.5 text-gray-700 hover:text-nova-teal text-sm font-bold flex items-center gap-2"
+                >
+                    <FileUp size={16} /> Upload Data
+                </button>
+             </div>
+
              <button 
                 onClick={handleSave}
                 disabled={!hasUnsavedChanges}

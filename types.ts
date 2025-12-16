@@ -67,3 +67,21 @@ export interface AppConfig {
   logoUrl: string;
   supportMessage: string;
 }
+
+// Guest Request Types
+export type RequestStatus = 'Pending' | 'In Progress' | 'Completed' | 'Cancelled';
+export type RequestPriority = 'Low' | 'Medium' | 'High';
+
+export interface GuestRequest {
+  id: string;
+  roomNumber: string;
+  guestName: string;
+  category: string; // e.g., Housekeeping, Maintenance, Amenities, F&B, Transportation
+  description: string;
+  status: RequestStatus;
+  priority: RequestPriority;
+  createdAt: string;
+  updatedAt: string;
+  assignedTo?: string; // userId
+  loggedBy: string; // Name of the user who entered the request
+}

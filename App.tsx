@@ -10,7 +10,8 @@ import { ChecklistManagement } from './components/ChecklistManagement';
 import { OccupancyManagement } from './components/OccupancyManagement';
 import { Settings } from './components/Settings';
 import { ShiftHistory } from './components/ShiftHistory';
-import { ShiftData, ShiftType, TaskCategory, Task, User, ShiftAssignment, AppConfig, TaskTemplate, DailyOccupancy } from './types';
+import { GuestRequests } from './components/GuestRequests';
+import { ShiftData, ShiftType, TaskCategory, Task, User, ShiftAssignment, AppConfig, TaskTemplate, DailyOccupancy, GuestRequest } from './types';
 import { Menu, Search, Bell, LogOut } from 'lucide-react';
 
 // --- Default Data ---
@@ -47,6 +48,12 @@ const INITIAL_TASK_TEMPLATES: TaskTemplate[] = [
     // Night
     { id: 'n1', label: 'Run Night Audit', category: 'Back Office & Reports', shiftType: 'Night' },
     { id: 'n2', label: 'Print Newspaper Summary', category: 'Guest Relations', shiftType: 'Night' }
+];
+
+const INITIAL_REQUESTS: GuestRequest[] = [
+    { id: 'req1', roomNumber: '105', guestName: 'Mr. John Smith', category: 'Housekeeping', description: 'Extra towels and pillows needed', status: 'Pending', priority: 'Medium', createdAt: new Date(Date.now() - 3600000).toISOString(), updatedAt: new Date().toISOString(), loggedBy: 'Ahmed Ihsaan' },
+    { id: 'req2', roomNumber: '210', guestName: 'Ms. Sarah Connor', category: 'Maintenance', description: 'Air conditioning is dripping water', status: 'In Progress', priority: 'High', createdAt: new Date(Date.now() - 7200000).toISOString(), updatedAt: new Date().toISOString(), loggedBy: 'Michael Chen' },
+    { id: 'req3', roomNumber: '305', guestName: 'Family Robinson', category: 'Transportation', description: 'Buggy needed for dinner at 7 PM', status: 'Pending', priority: 'Low', createdAt: new Date(Date.now() - 1800000).toISOString(), updatedAt: new Date().toISOString(), loggedBy: 'Ahmed R.' },
 ];
 
 const getTodayStr = () => new Date().toISOString().split('T')[0];
@@ -90,6 +97,7 @@ export const App: React.FC = () => {
     const [templates, setTemplates] = useState<TaskTemplate[]>(INITIAL_TASK_TEMPLATES);
     const [rosterAssignments, setRosterAssignments] = useState<ShiftAssignment[]>(INITIAL_ROSTER_ASSIGNMENTS);
     const [occupancyData, setOccupancyData] = useState<DailyOccupancy[]>(generateInitialOccupancy());
+    const [guestRequests, setGuestRequests] = useState<GuestRequest[]>(INITIAL_REQUESTS);
 
     // Current Shift State
     const [currentShift, setCurrentShift] = useState<ShiftData>({
@@ -197,6 +205,23 @@ export const App: React.FC = () => {
         setUsers(users.filter(u => u.id !== id));
     };
 
+    // Guest Request Handlers
+    // Updated to accept Omit loggedBy, as App.tsx adds it
+    const handleAddRequest = (request: Omit<GuestRequest, 'id' | 'createdAt' | 'updatedAt' | 'loggedBy'>) => {
+        const newReq: GuestRequest = {
+            ...request,
+            id: `req-${Date.now()}`,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            loggedBy: currentUser?.name || 'Unknown Agent'
+        };
+        setGuestRequests([newReq, ...guestRequests]);
+    };
+
+    const handleUpdateRequest = (id: string, updates: Partial<GuestRequest>) => {
+        setGuestRequests(prev => prev.map(r => r.id === id ? { ...r, ...updates, updatedAt: new Date().toISOString() } : r));
+    };
+
     if (!currentUser) {
         return <Login users={users} onLogin={handleLogin} appConfig={appConfig} />;
     }
@@ -219,6 +244,12 @@ export const App: React.FC = () => {
                     onToggleTask={toggleTask}
                     onUpdateNotes={updateNotes}
                     onEndShift={() => alert('Shift Ended')}
+                />;
+            case 'guest-requests':
+                return <GuestRequests 
+                    requests={guestRequests}
+                    onRequestAdd={handleAddRequest}
+                    onRequestUpdate={handleUpdateRequest}
                 />;
             case 'shift-management':
                 return <ShiftManagement 
@@ -285,7 +316,9 @@ export const App: React.FC = () => {
                      <div className="flex items-center gap-4 ml-auto">
                          <button className="p-2 text-gray-400 hover:text-nova-teal transition-colors relative">
                              <Bell size={20} />
-                             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                             {guestRequests.filter(r => r.status === 'Pending').length > 0 && (
+                                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                             )}
                          </button>
                          <div className="h-8 w-px bg-gray-100 mx-2"></div>
                          <div className="flex items-center gap-3">

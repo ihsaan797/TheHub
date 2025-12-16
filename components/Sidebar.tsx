@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, CheckSquare, History, Settings, LifeBuoy, BarChart3, Users, Briefcase, ListChecks, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, History, Settings, LifeBuoy, BarChart3, Users, Briefcase, ListChecks, TrendingUp, BellRing } from 'lucide-react';
 import { UserRole, AppConfig } from '../types';
 
 interface SidebarProps {
@@ -13,6 +13,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, u
   const navItems = [
     { id: 'dashboard', label: 'My Dashboard', icon: <LayoutDashboard size={20} /> },
     { id: 'checklist', label: 'Current Shift', icon: <CheckSquare size={20} /> },
+    { id: 'guest-requests', label: 'Guest Requests', icon: <BellRing size={20} /> },
   ];
   
   const isManager = userRole === 'Front Office Manager' || userRole === 'Asst. FOM';
