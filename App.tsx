@@ -15,7 +15,7 @@ import { ShiftData, ShiftType, TaskCategory, Task, User, ShiftAssignment, AppCon
 import { Menu, Search, Bell, LogOut } from 'lucide-react';
 import { supabase } from './services/supabaseClient';
 
-// --- Default Data (Fallbacks) ---
+// --- Default Data (Fallbacks & Seeds) ---
 const INITIAL_USERS: User[] = [
   { id: 'u1', username: 'Ahmed.Ihsaan', name: 'Ahmed Ihsaan', role: 'Front Office Manager', initials: 'AI', color: 'bg-purple-100 text-purple-600', password: 'password123' },
   { id: 'u2', username: 'Michael.Chen', name: 'Michael Chen', role: 'Asst. FOM', initials: 'MC', color: 'bg-blue-100 text-blue-600', password: 'password123' },
@@ -95,13 +95,26 @@ export const App: React.FC = () => {
         notes: ''
     });
 
-    // --- SUPABASE DATA FETCHING ---
+    // --- SUPABASE DATA FETCHING & SEEDING ---
     useEffect(() => {
         const fetchAllData = async () => {
             // 1. Fetch Users
-            const { data: userData } = await supabase.from('users').select('*');
-            if (userData && userData.length > 0) {
+            const { data: userData, error: userError } = await supabase.from('users').select('*');
+            
+            if (userError) {
+                console.warn("Supabase Users Error (using local defaults):", userError.message);
+                // Keep INITIAL_USERS as fallback
+            } else if (userData && userData.length > 0) {
                 setUsers(userData);
+            } else {
+                // Table exists but is empty. Seed default users.
+                console.log("Seeding empty database with default users...");
+                const { error: seedError } = await supabase.from('users').insert(INITIAL_USERS);
+                if (!seedError) {
+                    setUsers(INITIAL_USERS);
+                } else {
+                    console.error("Failed to seed users:", seedError);
+                }
             }
 
             // 2. Fetch Templates
@@ -114,6 +127,15 @@ export const App: React.FC = () => {
                     shiftType: t.shift_type
                 }));
                 setTemplates(mappedTmpl);
+            } else if (tmplData && tmplData.length === 0) {
+                // Seed templates if empty
+                const dbTmpls = INITIAL_TASK_TEMPLATES.map(t => ({
+                    id: t.id,
+                    label: t.label,
+                    category: t.category,
+                    shift_type: t.shiftType
+                }));
+                await supabase.from('task_templates').insert(dbTmpls);
             }
 
             // 3. Fetch Roster
@@ -154,6 +176,26 @@ export const App: React.FC = () => {
                     loggedBy: d.logged_by
                 }));
                 setGuestRequests(mappedRequests);
+            }
+
+            // 6. Fetch Settings
+            const { data: settingsData, error: settingsError } = await supabase.from('settings').select('*').eq('id', 'global').single();
+            if (settingsData) {
+                setAppConfig({
+                    appName: settingsData.app_name,
+                    logoUrl: settingsData.logo_url || '',
+                    supportMessage: settingsData.support_message || ''
+                });
+            } else if (settingsError && settingsError.code === 'PGRST116') {
+                 // PGRST116 is "The result contains 0 rows"
+                 // Seed default settings
+                 const defaultConfig = {
+                     id: 'global',
+                     app_name: 'Nova Maldives | Front Office',
+                     logo_url: '',
+                     support_message: 'Contact IT for support.'
+                 };
+                 await supabase.from('settings').insert([defaultConfig]);
             }
         };
 
@@ -292,9 +334,6 @@ export const App: React.FC = () => {
         
         if (!error) {
             setRosterAssignments(newAssignments);
-            // Also need to clean up deleted ones? 
-            // For simplicity in this demo, we assume upsert covers adds/edits. 
-            // A full sync would require deleting missing IDs or clearing the table for the range.
             alert('Roster saved successfully.');
         } else {
             alert('Failed to save roster.');
@@ -391,6 +430,23 @@ export const App: React.FC = () => {
         }
     };
 
+    // --- SETTINGS MANAGEMENT (Supabase) ---
+    const handleSaveSettings = async (newConfig: AppConfig) => {
+        const { error } = await supabase.from('settings').upsert({
+            id: 'global',
+            app_name: newConfig.appName,
+            logo_url: newConfig.logoUrl,
+            support_message: newConfig.supportMessage
+        });
+
+        if (!error) {
+            setAppConfig(newConfig);
+        } else {
+            alert('Failed to save settings.');
+            console.error(error);
+        }
+    };
+
     if (!currentUser) {
         return <Login users={users} onLogin={handleLogin} appConfig={appConfig} />;
     }
@@ -459,7 +515,7 @@ export const App: React.FC = () => {
              case 'history':
                 return <ShiftHistory />;
              case 'settings':
-                return <Settings userRole={currentUser.role} config={appConfig} onSave={setAppConfig} />;
+                return <Settings userRole={currentUser.role} config={appConfig} onSave={handleSaveSettings} />;
             default:
                 return <Dashboard 
                     currentShift={currentShift} 

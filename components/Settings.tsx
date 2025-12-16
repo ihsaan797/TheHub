@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UserRole, AppConfig } from '../types';
-import { Save, Layout, Image, ShieldAlert, Check, Upload, X, MessageSquare } from 'lucide-react';
+import { Save, Layout, Image, ShieldAlert, Check, Upload, X, MessageSquare, Loader2 } from 'lucide-react';
 
 interface SettingsProps {
   userRole?: UserRole;
   config: AppConfig;
-  onSave: (newConfig: AppConfig) => void;
+  onSave: (newConfig: AppConfig) => Promise<void>;
 }
 
 export const Settings: React.FC<SettingsProps> = ({ userRole, config, onSave }) => {
@@ -13,6 +13,7 @@ export const Settings: React.FC<SettingsProps> = ({ userRole, config, onSave }) 
   const [logoUrl, setLogoUrl] = useState(config.logoUrl);
   const [supportMessage, setSupportMessage] = useState(config.supportMessage || '');
   const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Sync local state if props change
@@ -24,15 +25,17 @@ export const Settings: React.FC<SettingsProps> = ({ userRole, config, onSave }) 
 
   const canEdit = userRole === 'Front Office Manager';
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canEdit) return;
     
-    onSave({
+    setIsSaving(true);
+    await onSave({
       appName,
       logoUrl,
       supportMessage
     });
+    setIsSaving(false);
     
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
@@ -41,7 +44,7 @@ export const Settings: React.FC<SettingsProps> = ({ userRole, config, onSave }) 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Limit size to 2MB to prevent state performance issues
+      // Limit size to 2MB to prevent state performance issues (and simple DB storage)
       if (file.size > 2 * 1024 * 1024) {
         alert("File size exceeds 2MB limit.");
         return;
@@ -214,11 +217,16 @@ export const Settings: React.FC<SettingsProps> = ({ userRole, config, onSave }) 
               <div className="pt-6 border-t border-gray-100 flex items-center gap-4">
                 <button
                   type="submit"
+                  disabled={isSaving}
                   className={`px-6 py-2.5 rounded-lg font-bold text-white shadow-lg transition-all flex items-center gap-2 ${
                     isSaved ? 'bg-green-500 shadow-green-200' : 'bg-nova-teal hover:bg-teal-700 shadow-teal-100'
-                  }`}
+                  } disabled:opacity-70 disabled:cursor-not-allowed`}
                 >
-                  {isSaved ? (
+                  {isSaving ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" /> Saving Changes...
+                      </>
+                  ) : isSaved ? (
                     <>
                       <Check size={18} /> Saved Successfully
                     </>
