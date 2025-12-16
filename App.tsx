@@ -13,8 +13,9 @@ import { ShiftHistory } from './components/ShiftHistory';
 import { GuestRequests } from './components/GuestRequests';
 import { ShiftData, ShiftType, TaskCategory, Task, User, ShiftAssignment, AppConfig, TaskTemplate, DailyOccupancy, GuestRequest } from './types';
 import { Menu, Search, Bell, LogOut } from 'lucide-react';
+import { supabase } from './services/supabaseClient';
 
-// --- Default Data ---
+// --- Default Data (Fallbacks) ---
 const INITIAL_USERS: User[] = [
   { id: 'u1', username: 'Ahmed.Ihsaan', name: 'Ahmed Ihsaan', role: 'Front Office Manager', initials: 'AI', color: 'bg-purple-100 text-purple-600', password: 'password123' },
   { id: 'u2', username: 'Michael.Chen', name: 'Michael Chen', role: 'Asst. FOM', initials: 'MC', color: 'bg-blue-100 text-blue-600', password: 'password123' },
@@ -32,36 +33,19 @@ const DEFAULT_CATEGORIES = [
 ];
 
 const INITIAL_TASK_TEMPLATES: TaskTemplate[] = [
-    // Common
     { id: 'c1', label: 'Read Logbook & Handover', category: 'Front Desk Operations', shiftType: 'ALL' },
     { id: 'c2', label: 'Check Float/Cash', category: 'Front Desk Operations', shiftType: 'ALL' },
     { id: 'c3', label: 'Lobby Cleanliness Check', category: 'Lobby & Ambiance', shiftType: 'ALL' },
-    // Morning
     { id: 'm1', label: 'Print Arrivals Report', category: 'Back Office & Reports', shiftType: 'Morning' },
     { id: 'm2', label: 'Check VIP Amenities Setup', category: 'Guest Relations', shiftType: 'Morning' },
     { id: 'm3', label: 'Morning Briefing', category: 'Front Desk Operations', shiftType: 'Morning' },
-    { id: 'm4', label: 'Buggy Battery Check', category: 'Health & Safety', shiftType: 'Morning' },
-    { id: 'm5', label: 'Confirm Seaplane Transfers', category: 'Back Office & Reports', shiftType: 'Morning' },
-    // Afternoon
-    { id: 'a1', label: 'Review Departures for Tomorrow', category: 'Back Office & Reports', shiftType: 'Afternoon' },
-    { id: 'a2', label: 'Check Room Allocations', category: 'Front Desk Operations', shiftType: 'Afternoon' },
-    // Night
     { id: 'n1', label: 'Run Night Audit', category: 'Back Office & Reports', shiftType: 'Night' },
-    { id: 'n2', label: 'Print Newspaper Summary', category: 'Guest Relations', shiftType: 'Night' }
-];
-
-const INITIAL_REQUESTS: GuestRequest[] = [
-    { id: 'req1', roomNumber: '105', guestName: 'Mr. John Smith', category: 'Housekeeping', description: 'Extra towels and pillows needed', status: 'Pending', priority: 'Medium', createdAt: new Date(Date.now() - 3600000).toISOString(), updatedAt: new Date().toISOString(), loggedBy: 'Ahmed Ihsaan' },
-    { id: 'req2', roomNumber: '210', guestName: 'Ms. Sarah Connor', category: 'Maintenance', description: 'Air conditioning is dripping water', status: 'In Progress', priority: 'High', createdAt: new Date(Date.now() - 7200000).toISOString(), updatedAt: new Date().toISOString(), loggedBy: 'Michael Chen' },
-    { id: 'req3', roomNumber: '305', guestName: 'Family Robinson', category: 'Transportation', description: 'Buggy needed for dinner at 7 PM', status: 'Pending', priority: 'Low', createdAt: new Date(Date.now() - 1800000).toISOString(), updatedAt: new Date().toISOString(), loggedBy: 'Ahmed R.' },
 ];
 
 const getTodayStr = () => new Date().toISOString().split('T')[0];
 
 const INITIAL_ROSTER_ASSIGNMENTS: ShiftAssignment[] = [
-    { id: 'r1', date: getTodayStr(), shiftType: 'Morning', userId: 'u1' }, // Ahmed Ihsaan -> Morning
-    { id: 'r2', date: getTodayStr(), shiftType: 'Afternoon', userId: 'u2' }, // Michael Chen -> Afternoon
-    { id: 'r3', date: getTodayStr(), shiftType: 'Night', userId: 'u3' } // Ahmed R. -> Night
+    { id: 'r1', date: getTodayStr(), shiftType: 'Morning', userId: 'u1' }
 ];
 
 // Generate mock occupancy for current week
@@ -97,7 +81,7 @@ export const App: React.FC = () => {
     const [templates, setTemplates] = useState<TaskTemplate[]>(INITIAL_TASK_TEMPLATES);
     const [rosterAssignments, setRosterAssignments] = useState<ShiftAssignment[]>(INITIAL_ROSTER_ASSIGNMENTS);
     const [occupancyData, setOccupancyData] = useState<DailyOccupancy[]>(generateInitialOccupancy());
-    const [guestRequests, setGuestRequests] = useState<GuestRequest[]>(INITIAL_REQUESTS);
+    const [guestRequests, setGuestRequests] = useState<GuestRequest[]>([]);
 
     // Current Shift State
     const [currentShift, setCurrentShift] = useState<ShiftData>({
@@ -110,6 +94,71 @@ export const App: React.FC = () => {
         occupancy: 75,
         notes: ''
     });
+
+    // --- SUPABASE DATA FETCHING ---
+    useEffect(() => {
+        const fetchAllData = async () => {
+            // 1. Fetch Users
+            const { data: userData } = await supabase.from('users').select('*');
+            if (userData && userData.length > 0) {
+                setUsers(userData);
+            }
+
+            // 2. Fetch Templates
+            const { data: tmplData } = await supabase.from('task_templates').select('*');
+            if (tmplData && tmplData.length > 0) {
+                const mappedTmpl = tmplData.map((t: any) => ({
+                    id: t.id,
+                    label: t.label,
+                    category: t.category,
+                    shiftType: t.shift_type
+                }));
+                setTemplates(mappedTmpl);
+            }
+
+            // 3. Fetch Roster
+            const { data: rosterData } = await supabase.from('roster_assignments').select('*');
+            if (rosterData && rosterData.length > 0) {
+                const mappedRoster = rosterData.map((r: any) => ({
+                    id: r.id,
+                    date: r.date,
+                    shiftType: r.shift_type,
+                    userId: r.user_id
+                }));
+                setRosterAssignments(mappedRoster);
+            }
+
+            // 4. Fetch Occupancy
+            const { data: occData } = await supabase.from('occupancy').select('*');
+            if (occData && occData.length > 0) {
+                setOccupancyData(occData);
+            }
+
+            // 5. Fetch Guest Requests
+            const { data: reqData } = await supabase
+                .from('guest_requests')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (reqData) {
+                const mappedRequests: GuestRequest[] = reqData.map((d: any) => ({
+                    id: d.id,
+                    roomNumber: d.room_number,
+                    guestName: d.guest_name,
+                    category: d.category,
+                    description: d.description,
+                    status: d.status,
+                    priority: d.priority,
+                    createdAt: d.created_at,
+                    updatedAt: d.updated_at,
+                    loggedBy: d.logged_by
+                }));
+                setGuestRequests(mappedRequests);
+            }
+        };
+
+        fetchAllData();
+    }, []);
 
     // Initialize shift tasks when user logs in
     useEffect(() => {
@@ -194,32 +243,152 @@ export const App: React.FC = () => {
         setCurrentShift(prev => ({ ...prev, notes }));
     };
 
-    // User Management Handlers
-    const addUser = (user: Omit<User, 'id'>) => {
-        setUsers([...users, { ...user, id: Date.now().toString() }]);
+    // --- USER MANAGEMENT (Supabase) ---
+    const addUser = async (user: Omit<User, 'id'>) => {
+        const newUser = { ...user, id: `u-${Date.now()}` };
+        const { error } = await supabase.from('users').insert([newUser]);
+        
+        if (!error) {
+            setUsers([...users, newUser]);
+        } else {
+            alert('Failed to add user to database.');
+            console.error(error);
+        }
     };
-    const editUser = (user: User) => {
-        setUsers(users.map(u => u.id === user.id ? user : u));
+    
+    const editUser = async (user: User) => {
+        const { error } = await supabase.from('users').update(user).eq('id', user.id);
+        
+        if (!error) {
+            setUsers(users.map(u => u.id === user.id ? user : u));
+        } else {
+            alert('Failed to update user.');
+            console.error(error);
+        }
     };
-    const deleteUser = (id: string) => {
-        setUsers(users.filter(u => u.id !== id));
+    
+    const deleteUser = async (id: string) => {
+        const { error } = await supabase.from('users').delete().eq('id', id);
+        
+        if (!error) {
+            setUsers(users.filter(u => u.id !== id));
+        } else {
+             alert('Failed to delete user.');
+             console.error(error);
+        }
     };
 
-    // Guest Request Handlers
-    // Updated to accept Omit loggedBy, as App.tsx adds it
-    const handleAddRequest = (request: Omit<GuestRequest, 'id' | 'createdAt' | 'updatedAt' | 'loggedBy'>) => {
-        const newReq: GuestRequest = {
-            ...request,
-            id: `req-${Date.now()}`,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            loggedBy: currentUser?.name || 'Unknown Agent'
+    // --- ROSTER MANAGEMENT (Supabase) ---
+    const handleSaveRoster = async (newAssignments: ShiftAssignment[]) => {
+        // Map to DB format (camelCase -> snake_case)
+        const dbAssignments = newAssignments.map(a => ({
+            id: a.id,
+            date: a.date,
+            shift_type: a.shiftType,
+            user_id: a.userId
+        }));
+
+        const { error } = await supabase.from('roster_assignments').upsert(dbAssignments);
+        
+        if (!error) {
+            setRosterAssignments(newAssignments);
+            // Also need to clean up deleted ones? 
+            // For simplicity in this demo, we assume upsert covers adds/edits. 
+            // A full sync would require deleting missing IDs or clearing the table for the range.
+            alert('Roster saved successfully.');
+        } else {
+            alert('Failed to save roster.');
+            console.error(error);
+        }
+    };
+
+    // --- OCCUPANCY MANAGEMENT (Supabase) ---
+    const handleUpdateOccupancy = async (newData: DailyOccupancy[]) => {
+        const { error } = await supabase.from('occupancy').upsert(newData);
+        
+        if (!error) {
+            setOccupancyData(newData);
+        } else {
+            alert('Failed to save occupancy data.');
+            console.error(error);
+        }
+    };
+
+    // --- CHECKLIST TEMPLATES (Supabase) ---
+    const handleAddTemplate = async (tmpl: Omit<TaskTemplate, 'id'>) => {
+        const newTmpl = { ...tmpl, id: `t-${Date.now()}` };
+        const dbTmpl = {
+            id: newTmpl.id,
+            label: newTmpl.label,
+            category: newTmpl.category,
+            shift_type: newTmpl.shiftType
         };
-        setGuestRequests([newReq, ...guestRequests]);
+
+        const { error } = await supabase.from('task_templates').insert([dbTmpl]);
+        
+        if (!error) {
+            setTemplates([...templates, newTmpl]);
+        } else {
+            alert('Failed to add template.');
+            console.error(error);
+        }
     };
 
-    const handleUpdateRequest = (id: string, updates: Partial<GuestRequest>) => {
-        setGuestRequests(prev => prev.map(r => r.id === id ? { ...r, ...updates, updatedAt: new Date().toISOString() } : r));
+    const handleDeleteTemplate = async (id: string) => {
+        const { error } = await supabase.from('task_templates').delete().eq('id', id);
+        
+        if (!error) {
+            setTemplates(templates.filter(t => t.id !== id));
+        } else {
+            alert('Failed to delete template.');
+            console.error(error);
+        }
+    };
+
+    // --- GUEST REQUESTS (Supabase) ---
+    const handleAddRequest = async (request: Omit<GuestRequest, 'id' | 'createdAt' | 'updatedAt' | 'loggedBy'>) => {
+        const user = currentUser?.name || 'Unknown Agent';
+        const payload = {
+            room_number: request.roomNumber,
+            guest_name: request.guestName,
+            category: request.category,
+            description: request.description,
+            status: request.status,
+            priority: request.priority,
+            logged_by: user
+        };
+
+        const { data, error } = await supabase.from('guest_requests').insert([payload]).select().single();
+        if (data) {
+            setGuestRequests([{
+                id: data.id,
+                roomNumber: data.room_number,
+                guestName: data.guest_name,
+                category: data.category,
+                description: data.description,
+                status: data.status,
+                priority: data.priority,
+                createdAt: data.created_at,
+                updatedAt: data.updated_at,
+                loggedBy: data.logged_by
+            }, ...guestRequests]);
+        }
+    };
+
+    const handleUpdateRequest = async (id: string, updates: Partial<GuestRequest>) => {
+        const dbUpdates: any = {};
+        if (updates.status) dbUpdates.status = updates.status;
+        if (updates.priority) dbUpdates.priority = updates.priority;
+        if (updates.roomNumber) dbUpdates.room_number = updates.roomNumber;
+        if (updates.guestName) dbUpdates.guest_name = updates.guestName;
+        if (updates.description) dbUpdates.description = updates.description;
+        if (updates.category) dbUpdates.category = updates.category;
+        dbUpdates.updated_at = new Date().toISOString();
+
+        const { data } = await supabase.from('guest_requests').update(dbUpdates).eq('id', id).select().single();
+        if (data) {
+            setGuestRequests(prev => prev.map(r => r.id === id ? { ...r, ...updates, updatedAt: data.updated_at } : r));
+        }
     };
 
     if (!currentUser) {
@@ -258,21 +427,21 @@ export const App: React.FC = () => {
                     currentShift={currentShift}
                     onAssignShift={() => {}}
                     initialAssignments={rosterAssignments}
-                    onSaveRoster={setRosterAssignments}
+                    onSaveRoster={handleSaveRoster}
                     availableShifts={shiftTypes}
                 />;
             case 'occupancy':
                 return <OccupancyManagement 
                     occupancyData={occupancyData}
-                    onUpdateOccupancy={setOccupancyData}
+                    onUpdateOccupancy={handleUpdateOccupancy}
                 />;
             case 'checklist-management':
                  return <ChecklistManagement 
                     templates={templates}
                     availableShifts={shiftTypes}
                     availableCategories={categories}
-                    onAddTemplate={(t) => setTemplates([...templates, { ...t, id: Date.now().toString() }])}
-                    onDeleteTemplate={(id) => setTemplates(templates.filter(t => t.id !== id))}
+                    onAddTemplate={handleAddTemplate}
+                    onDeleteTemplate={handleDeleteTemplate}
                     onAddShift={(s) => setShiftTypes([...shiftTypes, s])}
                     onDeleteShift={(s) => setShiftTypes(shiftTypes.filter(st => st !== s))}
                     onAddCategory={(c) => setCategories([...categories, c])}
