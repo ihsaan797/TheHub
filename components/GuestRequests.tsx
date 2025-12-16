@@ -126,7 +126,7 @@ export const GuestRequests: React.FC<GuestRequestsProps> = ({ requests, onReques
     
     doc.setTextColor(60, 60, 60);
     doc.setFontSize(14);
-    doc.text("Daily Guest Request Report", 14, 35);
+    doc.text("HUB TRAFFIC SHEET", 14, 35);
     
     doc.setFontSize(10);
     doc.setTextColor(100);
@@ -168,7 +168,7 @@ export const GuestRequests: React.FC<GuestRequestsProps> = ({ requests, onReques
       columnStyles: { 5: { cellWidth: 40 } } // Description column width adjusted
     });
 
-    doc.save(`Nova_Guest_Requests_${selectedDate}.pdf`);
+    doc.save(`Nova_HUB_Traffic_Sheet_${selectedDate}.pdf`);
   };
 
   // Sort by priority (High first) and then by date (Newest first)
