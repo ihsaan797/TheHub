@@ -1,4 +1,5 @@
 
+
 export type ShiftType = string;
 
 export type TaskCategory = string;
@@ -36,7 +37,7 @@ export interface ChartDataPoint {
   fill?: string;
 }
 
-export type UserRole = 'Front Office Manager' | 'Asst. FOM' | 'Senior GSA' | 'GSA';
+export type UserRole = 'Front Office Manager' | 'Asst. FOM' | 'Senior GSA' | 'GSA' | 'Management';
 
 export interface User {
   id: string;

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User, UserRole } from '../types';
-import { Plus, Trash2, Search, Shield, User as UserIcon, Edit2, Lock } from 'lucide-react';
+import { Plus, Trash2, Search, Shield, User as UserIcon, Edit2, Lock, Briefcase } from 'lucide-react';
 
 interface UserManagementProps {
   users: User[];
@@ -155,6 +155,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ users, onAddUser
                 <option value="Senior GSA">Senior GSA</option>
                 <option value="Asst. FOM">Asst. FOM</option>
                 <option value="Front Office Manager">Front Office Manager</option>
+                <option value="Management">Management</option>
               </select>
             </div>
             <div>
@@ -229,9 +230,12 @@ export const UserManagement: React.FC<UserManagementProps> = ({ users, onAddUser
                         ? 'bg-purple-50 text-purple-700 border-purple-100'
                         : user.role === 'Asst. FOM' 
                         ? 'bg-blue-50 text-blue-700 border-blue-100'
+                        : user.role === 'Management'
+                        ? 'bg-gray-800 text-white border-gray-900'
                         : 'bg-gray-50 text-gray-600 border-gray-100'
                     }`}>
                       {user.role === 'Front Office Manager' && <Shield size={12} />}
+                      {user.role === 'Management' && <Briefcase size={12} />}
                       {user.role}
                     </span>
                   </td>

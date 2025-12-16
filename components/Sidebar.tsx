@@ -10,33 +10,41 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, userRole, appConfig }) => {
-  const navItems = [
-    { id: 'dashboard', label: 'My Dashboard', icon: <LayoutDashboard size={20} /> },
-    { id: 'checklist', label: 'Current Shift', icon: <CheckSquare size={20} /> },
-    { id: 'guest-requests', label: 'Guest Requests', icon: <BellRing size={20} /> },
-  ];
-  
-  const isManager = userRole === 'Front Office Manager' || userRole === 'Asst. FOM';
+  let navItems = [];
 
-  // Shift Management and Analytics for Managers only
-  if (isManager) {
-      navItems.push({ id: 'shift-management', label: 'Shift Management', icon: <Briefcase size={20} /> });
-      navItems.push({ id: 'occupancy', label: 'Occupancy Planner', icon: <TrendingUp size={20} /> });
-      navItems.push({ id: 'checklist-management', label: 'Checklist Manager', icon: <ListChecks size={20} /> });
-      navItems.push({ id: 'admin', label: 'Admin Overview', icon: <BarChart3 size={20} /> });
-  }
+  if (userRole === 'Management') {
+      navItems = [
+          { id: 'guest-requests', label: 'Guest Requests', icon: <BellRing size={20} /> }
+      ];
+  } else {
+      navItems = [
+        { id: 'dashboard', label: 'My Dashboard', icon: <LayoutDashboard size={20} /> },
+        { id: 'checklist', label: 'Current Shift', icon: <CheckSquare size={20} /> },
+        { id: 'guest-requests', label: 'Guest Requests', icon: <BellRing size={20} /> },
+      ];
+      
+      const isManager = userRole === 'Front Office Manager' || userRole === 'Asst. FOM';
 
-  // Shift History is visible to all roles (Managers, Senior GSA, GSA)
-  navItems.push({ id: 'history', label: 'Shift History', icon: <History size={20} /> });
+      // Shift Management and Analytics for Managers only
+      if (isManager) {
+          navItems.push({ id: 'shift-management', label: 'Shift Management', icon: <Briefcase size={20} /> });
+          navItems.push({ id: 'occupancy', label: 'Occupancy Planner', icon: <TrendingUp size={20} /> });
+          navItems.push({ id: 'checklist-management', label: 'Checklist Manager', icon: <ListChecks size={20} /> });
+          navItems.push({ id: 'admin', label: 'Admin Overview', icon: <BarChart3 size={20} /> });
+      }
 
-  // Only show Team Management for FOM
-  if (userRole === 'Front Office Manager') {
-      navItems.push({ id: 'users', label: 'Team Management', icon: <Users size={20} /> });
-  }
+      // Shift History is visible to all roles (Managers, Senior GSA, GSA)
+      navItems.push({ id: 'history', label: 'Shift History', icon: <History size={20} /> });
 
-  // Settings for Managers only
-  if (isManager) {
-      navItems.push({ id: 'settings', label: 'Settings', icon: <Settings size={20} /> });
+      // Only show Team Management for FOM
+      if (userRole === 'Front Office Manager') {
+          navItems.push({ id: 'users', label: 'Team Management', icon: <Users size={20} /> });
+      }
+
+      // Settings for Managers only
+      if (isManager) {
+          navItems.push({ id: 'settings', label: 'Settings', icon: <Settings size={20} /> });
+      }
   }
 
   return (

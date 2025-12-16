@@ -242,6 +242,11 @@ export const App: React.FC = () => {
 
     const handleLogin = (user: User) => {
         setCurrentUser(user);
+        if (user.role === 'Management') {
+            setCurrentView('guest-requests');
+        } else {
+            setCurrentView('dashboard');
+        }
     };
 
     const handleLogout = () => {
