@@ -8,11 +8,12 @@ interface GuestRequestsProps {
   requests: GuestRequest[];
   onRequestAdd: (request: Omit<GuestRequest, 'id' | 'createdAt' | 'updatedAt' | 'loggedBy'>) => void;
   onRequestUpdate: (id: string, updates: Partial<GuestRequest>) => void;
+  logoUrl?: string;
 }
 
 const CATEGORIES = ['Housekeeping', 'Maintenance', 'Amenities', 'Food & Beverage', 'Transportation', 'Other'];
 
-export const GuestRequests: React.FC<GuestRequestsProps> = ({ requests, onRequestAdd, onRequestUpdate }) => {
+export const GuestRequests: React.FC<GuestRequestsProps> = ({ requests, onRequestAdd, onRequestUpdate, logoUrl }) => {
   const [filterStatus, setFilterStatus] = useState<RequestStatus | 'All'>('All');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -103,7 +104,25 @@ export const GuestRequests: React.FC<GuestRequestsProps> = ({ requests, onReques
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
-    doc.text("NOVA MALDIVES", 14, 16);
+
+    let titleX = 14;
+    
+    if (logoUrl) {
+        try {
+            // Check if logoUrl is a data URI or try to guess format
+            const isDataUri = logoUrl.startsWith('data:image/');
+            // Default to PNG if format cannot be determined easily, though addImage can often infer from data URI
+            const format = isDataUri ? logoUrl.split(';')[0].split('/')[1].toUpperCase() : 'PNG';
+            
+            // Add Logo (x=10, y=2, w=20, h=20)
+            doc.addImage(logoUrl, format, 10, 2, 20, 20);
+            titleX = 35; // Shift title to the right
+        } catch (e) {
+            console.warn("Could not add logo to PDF:", e);
+        }
+    }
+
+    doc.text("NOVA MALDIVES", titleX, 16);
     
     doc.setTextColor(60, 60, 60);
     doc.setFontSize(14);

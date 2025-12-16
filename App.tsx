@@ -250,6 +250,7 @@ export const App: React.FC = () => {
                     requests={guestRequests}
                     onRequestAdd={handleAddRequest}
                     onRequestUpdate={handleUpdateRequest}
+                    logoUrl={appConfig.logoUrl}
                 />;
             case 'shift-management':
                 return <ShiftManagement 
